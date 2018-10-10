@@ -1,49 +1,98 @@
 # 
 # 
 rm(list = ls(all=TRUE))  
-library(dplyr)
-library(ggplot2)
-library(lubridate)
-library(data.table)
+library(shiny)
+library(DT)
 
-full.data <- read.csv("joined.csv", stringsAsFactors= TRUE)
+# Make the user interface
+ui <- shiny::fluidPage(theme = "bootstrap.css",
+                           # Add a side panel for inputs
+                           shiny::sidebarPanel(width = 2,
+                                               shiny::fileInput(inputId = 'dataset', 
+                                                                   label = h4('Choose .csv file to upload'),
+                                                                   accept = c('.csv')
+                                                  ),
+                                                  helpText("Warning: Data set has to include all of the following columns:",
+                                                           "band_size  band_sequence  species  Date(as ymd)  year"),
+                                               shiny::selectInput(inputId = "errorSeek", 
+                                                                  label = h4("Choose error seeking option"),
+                                                                  choices = c('None',
+                                                                              'NA in species or band number',
+                                                                              'Species - band number discrepancies',
+                                                                              'Same-season recaptures', 
+                                                                              'Band sequence discrepancies'))
+                                               ),
+                       mainPanel(DTOutput("table"))
+                       )
 
-# full.data <- subset(full.data, days_diff >= 300 | is.na(days_diff)) 
-
-# Join effort data with data set
-# effort <- read.csv('OpWall band data effort.csv')
-# effort <- effort %>% mutate(open = sprintf("%04d",open), close = sprintf("%04d",close)) %>% 
-#   mutate(open= sub("([[:digit:]]{2,2})$", ":\\1", open), close= sub("([[:digit:]]{2,2})$", ":\\1", close) ) %>% 
-#   mutate(open= dmy_hm(paste(Date, open, sep=" ")), close= dmy_hm(paste(Date, close, sep=" ")),
-#          hours= close-open, 
-#          net_hours_day= hours*Nets,
-#          Date= dmy(Date)) %>% 
-#   group_by(Date) %>% 
-#   mutate(total_net_hours_day=sum(net_hours_day)) %>% ungroup()
-# 
-# to_join <- data.frame(Loc=effort$Loc, Date=effort$Date,
-#                       total_net_hours_day=effort$total_net_hours_day)
-# data <- merge(data, to_join, by=c('Loc', 'Date'), all.x=T)
-# write.csv(data, "joined.csv")
-
-
-##### Data cleaning
-
-# Are there any NA values for species or band number?
-check1 <- full.data %>% filter(is.na(Band.ID), is.na(species)) %>% 
-
-# Has any bird with same band number been identified as different species?
-check2 <- full.data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% View() 
-
-# Are there still any same-season recaptures in the data?
-check3 <- full.data %>% 
-  mutate(Date = ymd(Date), field.season=as.factor(year)) %>% 
-  group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
-                                                                      units='days')) %>% 
-  filter(days_diff < 300) %>% View()
+# Make the server functions
+server <- function(input, output) {
+  data <- reactive({
+    req(input$dataset)
+    data <- read.csv(input$dataset$datapath)
+  })
   
-# Check the band number series
+  shiny::observeEvent({
+    input$dataset
+    input$errorSeek}, {
+      
+      observe({
+        if(input$errorSeek == 'None'){
+          output$table <-  renderDT({
+          data()
+            },options = list(scrollX = TRUE),editable = TRUE)
+        }
+      })
+      
+      observe({
+        if(input$errorSeek == 'NA in species or band number'){
+          output$table <-  renderDT({
+            data <- data()
+            data <- data %>% filter(is.na(Band.ID), is.na(species))
+          },options = list(scrollX = TRUE),editable = TRUE)
+        }
+      })
+      
+      observe({
+        if(input$errorSeek == 'Species - band number discrepancies'){
+          output$table <-  renderDT({
+            data <- data()
+            data <- data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% 
+              arrange(Band.ID) %>%
+              select(Band.ID, species, everything())
+          },options = list(scrollX = TRUE),editable = TRUE)
+        }
+      })
+      
+      observe({
+        if(input$errorSeek == 'Same-season recaptures'){
+          output$table <-  renderDT({
+            data <- data()
+            data <- data %>% 
+              mutate(Date = ymd(Date), field.season=as.factor(year)) %>% 
+              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
+                                                                                  units='days')) %>% 
+              filter(days_diff < 300) %>% 
+              arrange(days_diff) %>%
+              select(days_diff, Date, species, Band.ID, everything())
+          },options = list(scrollX = TRUE),editable = TRUE)
+        }
+      })
+      
+      observe({
+        if(input$errorSeek == 'Band sequence discrepancies'){
+          output$table <-  renderDT({
+            data <- data()
+            data <- data %>% group_by(band_size) %>% arrange(band_sequence) %>% mutate(band_diff = band_sequence - dplyr::lag(band_sequence)) %>% 
+              filter(band_sequence == boxplot(band_sequence)$out) %>% 
+              arrange(band_diff) %>%
+              select(band_diff, species, Band.ID, everything())
+          },options = list(scrollX = TRUE),editable = TRUE)
+        }
+      })
+      
+      
+      })
+  }
 
-data.table::setDT(full.data)[, band_diff := c(NA, round(band_sequence[-1L] - band_sequence[-.N])), by= band_size]
-
-check4 <- full.data %>% group_by(band_size) %>% arrange(band_sequence) %>% mutate(band_diff = band_sequence - dplyr::lag(band_sequence)) %>% View()
+shiny::shinyApp(ui, server)
