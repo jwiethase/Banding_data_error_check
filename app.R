@@ -6,11 +6,7 @@ library(ggplot2)
 library(lubridate)
 library(data.table)
 
-full.data <- read.csv("joined.csv", stringsAsFactors= TRUE) %>% 
-  mutate(date = ymd(Date), field.season=as.factor(year)) 
-full.data$band_size <- substr(full.data$Band.ID, start = 1, stop = 2)
-full.data$band_sequence <- as.integer(substrRight(as.character(full.data$Band.ID), 3))
-write.csv("joined.csv")
+full.data <- read.csv("joined.csv", stringsAsFactors= TRUE)
 
 # full.data <- subset(full.data, days_diff >= 300 | is.na(days_diff)) 
 
@@ -40,18 +36,14 @@ check1 <- full.data %>% filter(is.na(Band.ID), is.na(species)) %>%
 check2 <- full.data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% View() 
 
 # Are there still any same-season recaptures in the data?
-data.table::setDT(full.data)[, days_diff := c(NA, round(difftime(date[-1L], date[-.N], 
-                                                                 units='days'))), by= Band.ID]
-check3 <- full.data %>%  filter(days_diff < 300) %>% View()
-
+check3 <- full.data %>% 
+  mutate(Date = ymd(Date), field.season=as.factor(year)) %>% 
+  group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
+                                                                      units='days')) %>% 
+  filter(days_diff < 300) %>% View()
+  
 # Check the band number series
-substrRight <- function(x, n){
-  substr(x, nchar(x)-n+1, nchar(x))
-}
 
+data.table::setDT(full.data)[, band_diff := c(NA, round(band_sequence[-1L] - band_sequence[-.N])), by= band_size]
 
-ggplot(full.data) +
-  geom_point(aes(as.integer(substrRight(as.character(Band.ID), 3)), band_size)) +
-  facet_grid(rows = vars(band_size), 
-             scales = 'free')
-
+check4 <- full.data %>% group_by(band_size) %>% arrange(band_sequence) %>% mutate(band_diff = band_sequence - dplyr::lag(band_sequence)) %>% View()
