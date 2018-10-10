@@ -15,8 +15,12 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                    label = h4('Choose .csv file to upload'),
                                                                    accept = c('.csv')
                                                   ),
-                                                  helpText("Warning: Data set has to include all of the following columns:",
-                                                           "band_size  band_sequence  species  Date(as ymd)  year"),
+                                               selectInput("band_size", "Select band size column", ' '),
+                                               selectInput("band_sequence", "Select band sequence column", ' '),
+                                               selectInput("species", "Select species column", ' '),
+                                               selectInput("Date", "Select date column (as ymd)", ' '),
+                                                  # helpText("Warning: Data set has to include all of the following columns:",
+                                                  #          "band_size | band_sequence | species | Date(as ymd)"),
                                                shiny::selectInput(inputId = "errorSeek", 
                                                                   label = h4("Choose error seeking option"),
                                                                   choices = c('None',
@@ -59,7 +63,12 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'NA in species or band number'){
           output$table <-  renderDT({
             data <- data()
-            data <- data %>% filter(is.na(Band.ID), is.na(species))
+            band_sequence <- req(input$band_sequence)
+            species <- req(input$species)
+            names(data)[names(data) == band_sequence] <- 'band.seq'
+            names(data)[names(data) == species] <- 'species'
+            
+            data <- data %>% filter(is.na(band_sequence), is.na(species))
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
@@ -68,9 +77,18 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'Species - band number discrepancies'){
           output$table <-  renderDT({
             data <- data()
-            data <- data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% 
-              arrange(Band.ID) %>%
-              select(Band.ID, species, everything())
+            band_sequence <- req(input$band_sequence)
+            band_size <- req(input$band_size)
+            species <- req(input$species)
+            
+            names(data)[names(data) == band_sequence] <- 'band.seq'
+            names(data)[names(data) == band_size] <- 'band.size'
+            names(data)[names(data) == species] <- 'Species.name'
+            data$BandID <- paste(data$band_size, data$band_sequence, sep="")
+            
+            data <- data %>% group_by(BandID) %>% dplyr::filter(length(unique(species)) > 1) %>% 
+              arrange(BandID) %>%
+              select(BandID, species, everything())
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
@@ -79,13 +97,25 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'Same-season recaptures'){
           output$table <-  renderDT({
             data <- data()
+            band_sequence <- req(input$band_sequence)
+            band_size <- req(input$band_size)
+            Date <- req(input$Date)
+            species <- req(input$species)
+            
+            names(data)[names(data) == band_sequence] <- 'band.seq'
+            names(data)[names(data) == band_size] <- 'band.size'
+            names(data)[names(data) == Date] <- 'date'
+            names(data)[names(data) == species] <- 'Species.name'
+            
+            data$BandID <- paste(data$band_size, data$band_sequence, sep="")
+            
             data <- data %>% 
-              mutate(Date = ymd(Date), field.season=as.factor(year)) %>% 
-              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
+              mutate(Date = ymd(Date)) %>% 
+              group_by(BandID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
                                                                                   units='days')) %>% 
               filter(days_diff < 300) %>% 
               arrange(days_diff) %>%
-              select(days_diff, Date, species, Band.ID, everything())
+              select(days_diff, Date, species, BandID, everything())
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
@@ -94,9 +124,21 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'Band sequence discrepancies'){
           output$table <-  renderDT({
             data <- data()
+            band_sequence <- req(input$band_sequence)
+            band_size <- req(input$band_size)
+            Date <- req(input$Date)
+            species <- req(input$species)
+            
+            names(data)[names(data) == band_sequence] <- 'band.seq'
+            names(data)[names(data) == band_size] <- 'band.size'
+            names(data)[names(data) == Date] <- 'date'
+            names(data)[names(data) == species] <- 'Species.name'
+            
+            data$BandID <- paste(data$band_size, data$band_sequence, sep="")
+            
             data <- data %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% mutate(band_diff = band_sequence - lag(band_sequence)) %>% 
               filter(band_diff > 1) %>% 
-              select(band_size, band_sequence,  band_diff, year, species, everything())
+              select(band_size, band_sequence,  band_diff, species, everything())
           }, options = list(scrollX = TRUE, paging = TRUE), editable = TRUE)
         }
       })
@@ -105,6 +147,18 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'Unusual band size'){
           output$table <-  renderDT({
             data <- data()
+            band_sequence <- req(input$band_sequence)
+            band_size <- req(input$band_size)
+            Date <- req(input$Date)
+            species <- req(input$species)
+            
+            names(data)[names(data) == band_sequence] <- 'band.seq'
+            names(data)[names(data) == band_size] <- 'band.size'
+            names(data)[names(data) == Date] <- 'date'
+            names(data)[names(data) == species] <- 'Species.name'
+            
+            data$BandID <- paste(data$band_size, data$band_sequence, sep="")
+            
             data <- data %>% group_by(species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(species) %>% 
               mutate(perc = round((100*N)/sum(unique(N)), digits = 1)) %>% 
@@ -117,6 +171,10 @@ server <- function(input, output, session) {
       
       observeEvent(data(), {
         updateSelectInput(session, "colID", choices=colnames(data()))
+        updateSelectInput(session, "band_size", choices=colnames(data()))
+        updateSelectInput(session, "band_sequence", choices=colnames(data()))
+        updateSelectInput(session, "species", choices=colnames(data()))
+        updateSelectInput(session, "Date", choices=colnames(data()))
       })
       
       observeEvent(input$go, {
