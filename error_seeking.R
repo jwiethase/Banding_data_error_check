@@ -1,100 +1,49 @@
+# 
+# 
+rm(list = ls(all=TRUE))  
+library(dplyr)
 library(ggplot2)
-library(Cairo)   # For nicer ggplot2 output when deployed on Linux
-library(shiny)
+library(lubridate)
+library(data.table)
 
-full.data <- read.csv("joined.csv", stringsAsFactors= TRUE) %>% 
-  mutate(date = ymd(Date), field.season=as.factor(year)) 
+full.data <- read.csv("joined.csv", stringsAsFactors= TRUE)
 
-ui <- fluidPage(
-  fluidRow(
-    # column(width = 4, class = "well",
-    #        h4("Brush and double-click to zoom"),
-    #        plotOutput("plot1", height = 300,
-    #                   dblclick = "plot1_dblclick",
-    #                   brush = brushOpts(
-    #                     id = "plot1_brush",
-    #                     resetOnNew = TRUE
-    #                   )
-    #        )
-    # ),
-    column(width = 8, class = "well",
-           h4("Left plot controls right plot"),
-           fluidRow(
-             column(width = 6,
-                    plotOutput("plot2", height = 300,
-                               brush = brushOpts(
-                                 id = "plot2_brush",
-                                 resetOnNew = TRUE
-                               )
-                    )
-             ),
-             column(width = 6,
-                    plotOutput("plot3", height = 300)
-             )
-           )
-    )
-    
-  )
-)
+# full.data <- subset(full.data, days_diff >= 300 | is.na(days_diff)) 
 
-server <- function(input, output) {
-  
-  # -------------------------------------------------------------------
-  # # Single zoomable plot (on left)
-  # ranges <- reactiveValues(x = NULL, y = NULL)
-  # 
-  # output$plot1 <- renderPlot({
-  #   ggplot(mtcars, aes(wt, mpg)) +
-  #     geom_point() +
-  #     coord_cartesian(xlim = ranges$x, ylim = ranges$y, expand = FALSE)
-  # })
-  # 
-  # When a double-click happens, check if there's a brush on the plot.
-  # If so, zoom to the brush bounds; if not, reset the zoom.
-  # observeEvent(input$plot1_dblclick, {
-  #   brush <- input$plot1_brush
-  #   if (!is.null(brush)) {
-  #     ranges$x <- c(brush$xmin, brush$xmax)
-  #     ranges$y <- c(brush$ymin, brush$ymax)
-  #     
-  #   } else {
-  #     ranges$x <- NULL
-  #     ranges$y <- NULL
-  #   }
-  # })
-  # 
-  # -------------------------------------------------------------------
-  # Linked plots (middle and right)
-  ranges2 <- reactiveValues(x = NULL, y = NULL)
-  
-  output$plot2 <- renderPlot({
-    
-    full.data$band_size <- substr(full.data$Band.ID, start = 1, stop = 2)
-    ggplot(full.data) +
-      geom_point(aes(as.integer(substrRight(as.character(Band.ID), 3)), band_size)) 
-  })
-  
-  output$plot3 <- renderPlot({
-    full.data$band_size <- substr(full.data$Band.ID, start = 1, stop = 2)
-    ggplot(full.data) +
-      geom_point(aes(as.integer(substrRight(as.character(Band.ID), 3)), band_size)) +
-      coord_cartesian(xlim = ranges2$x, ylim = ranges2$y, expand = FALSE)
-  })
-  
-  # When a double-click happens, check if there's a brush on the plot.
-  # If so, zoom to the brush bounds; if not, reset the zoom.
-  observe({
-    brush <- input$plot2_brush
-    if (!is.null(brush)) {
-      ranges2$x <- c(brush$xmin, brush$xmax)
-      ranges2$y <- c(brush$ymin, brush$ymax)
-      
-    } else {
-      ranges2$x <- NULL
-      ranges2$y <- NULL
-    }
-  })
-  
-}
+# Join effort data with data set
+# effort <- read.csv('OpWall band data effort.csv')
+# effort <- effort %>% mutate(open = sprintf("%04d",open), close = sprintf("%04d",close)) %>% 
+#   mutate(open= sub("([[:digit:]]{2,2})$", ":\\1", open), close= sub("([[:digit:]]{2,2})$", ":\\1", close) ) %>% 
+#   mutate(open= dmy_hm(paste(Date, open, sep=" ")), close= dmy_hm(paste(Date, close, sep=" ")),
+#          hours= close-open, 
+#          net_hours_day= hours*Nets,
+#          Date= dmy(Date)) %>% 
+#   group_by(Date) %>% 
+#   mutate(total_net_hours_day=sum(net_hours_day)) %>% ungroup()
+# 
+# to_join <- data.frame(Loc=effort$Loc, Date=effort$Date,
+#                       total_net_hours_day=effort$total_net_hours_day)
+# data <- merge(data, to_join, by=c('Loc', 'Date'), all.x=T)
+# write.csv(data, "joined.csv")
 
-shinyApp(ui, server)
+
+##### Data cleaning
+
+# Are there any NA values for species or band number?
+check1 <- full.data %>% filter(is.na(Band.ID), is.na(species)) %>% 
+  
+  # Has any bird with same band number been identified as different species?
+  check2 <- full.data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% View() 
+
+# Are there still any same-season recaptures in the data?
+check3 <- full.data %>% 
+  mutate(Date = ymd(Date), field.season=as.factor(year)) %>% 
+  group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
+                                                                      units='days')) %>% 
+  filter(days_diff < 300) %>% View()
+
+# Check the band number series
+
+data.table::setDT(full.data)[, band_diff := c(NA, round(band_sequence[-1L] - band_sequence[-.N])), by= band_size]
+
+check4 <- full.data %>% group_by(band_size) %>% arrange(band_sequence) %>% mutate(band_diff = band_sequence - dplyr::lag(band_sequence)) %>% View()
