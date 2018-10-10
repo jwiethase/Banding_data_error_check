@@ -30,10 +30,10 @@ full.data <- read.csv("joined.csv", stringsAsFactors= TRUE)
 ##### Data cleaning
 
 # Are there any NA values for species or band number?
-check1 <- full.data %>% filter(is.na(Band.ID), is.na(species)) %>% 
+check1 <- full.data %>% filter(is.na(Band.ID), is.na(species))
   
-  # Has any bird with same band number been identified as different species?
-  check2 <- full.data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% View() 
+# Has any bird with same band number been identified as different species?
+check2 <- full.data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(species)) > 1) %>% View() 
 
 # Are there still any same-season recaptures in the data?
 check3 <- full.data %>% 
@@ -43,7 +43,4 @@ check3 <- full.data %>%
   filter(days_diff < 300) %>% View()
 
 # Check the band number series
-
-data.table::setDT(full.data)[, band_diff := c(NA, round(band_sequence[-1L] - band_sequence[-.N])), by= band_size]
-
 check4 <- full.data %>% group_by(band_size) %>% arrange(band_sequence) %>% mutate(band_diff = band_sequence - dplyr::lag(band_sequence)) %>% View()
