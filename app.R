@@ -71,7 +71,7 @@ server <- function(input, output, session) {
             data <- data()
             names <- colnames(data)
             name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            name.band <- names[grepl(c("Band", "ID"), names, ignore.case=TRUE) == TRUE]
+            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.band] <- 'Band.ID'
             names(data)[names(data) == name.spec] <- 'Species'
             
@@ -91,7 +91,7 @@ server <- function(input, output, session) {
             names <- colnames(data)
             name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl(c("Band", "ID"), names, ignore.case=TRUE) == TRUE]
+            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.band] <- 'Band.ID'
             
             data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
@@ -112,7 +112,7 @@ server <- function(input, output, session) {
             names <- colnames(data)
             name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl(c("Band", "ID"), names, ignore.case=TRUE) == TRUE]
+            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.band] <- 'Band.ID'
             
             data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
@@ -138,7 +138,7 @@ server <- function(input, output, session) {
             names(data)[names(data) == name.Recap] <- 'Recap'
             name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl(c("Band", "ID"), names, ignore.case=TRUE) == TRUE]
+            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.band] <- 'Band.ID'
             
             data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
@@ -168,7 +168,7 @@ server <- function(input, output, session) {
             names <- colnames(data)
             name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl(c("Band", "ID"), names, ignore.case=TRUE) == TRUE]
+            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
             names(data)[names(data) == name.band] <- 'Band.ID'
             
             data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
