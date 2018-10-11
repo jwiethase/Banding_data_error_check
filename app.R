@@ -1,4 +1,4 @@
-# 
+# Author: Joris Wiethase
 # 
 rm(list = ls(all=TRUE))  
 library(shiny)
