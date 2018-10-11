@@ -6,3 +6,4 @@ OpWall_banding_data.csv
 OpWall band data effort.csv
 joined.csv
 .DS_Store
+error_codes.R
