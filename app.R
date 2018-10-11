@@ -33,6 +33,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                           'Same-season recaptures', 
                                                                           'Band sequence discrepancies',
                                                                           'Unusual band size')),
+                                           # uiOutput("slider"),
                                            hr(),
                                            selectInput("colID", "Select column for typo check", ' '),
                                            actionButton("go", "Check!", icon = icon("angle-double-right"), width = "auto")
@@ -45,10 +46,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
 server <- function(input, output, session) {
   data <- reactive({
     req(input$dataset)
-    data <- read.csv(input$dataset$datapath) 
-    if("X" %in% names(data) == TRUE){
-      data <- data %>% dplyr::select(-X)
-    }
+    read.csv(input$dataset$datapath) 
   })
   
   observeEvent(data(), {
@@ -84,6 +82,7 @@ server <- function(input, output, session) {
       
       observe({
         if(input$errorSeek == 'Species - band number discrepancies'){
+          
           output$table <-  renderDT({
             data <- data()
             names <- colnames(data)
@@ -138,6 +137,13 @@ server <- function(input, output, session) {
           
             data <- data %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% mutate(band_diff = band_sequence - lag(band_sequence))
             data$band_diff[is.na(data$band_diff)] <- 0
+            
+            # observe({
+            # output$slider <- renderUI({
+            #   sliderInput("inSlider", "Band difference range", min=min(data$band_diff), max=max(data$band_diff), value=2)
+            # })
+            # })
+            
             data <- data %>% 
               filter(band_diff > 2) %>% 
               dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
