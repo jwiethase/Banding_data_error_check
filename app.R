@@ -102,21 +102,21 @@ server <- function(input, output, session) {
         }
         if(input$errorSeek == 'Band sequence discrepancies'){
           seq_data <- reactive({
-            data <- data() %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% mutate(band_diff = band_sequence - lag(band_sequence)) 
+            data <- data() %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% 
+              mutate(band_diff = band_sequence - lag(band_sequence)) 
             data$band_diff[is.na(data$band_diff)] <- 0
             data
           })
           output$slider <- renderUI({
             seq_data <- seq_data()
-            sliderInput("inSlider", "Band difference range", min=min(seq_data$band_diff), max=max(seq_data$band_diff), value=2)
+            sliderInput("inSlider", "Max. band difference", min=min(seq_data$band_diff), max=max(seq_data$band_diff), value=median(seq_data$band_diff))
           })
           observeEvent(input$inSlider, {
             output$table <-  renderDT({
               seq_data() %>% 
-                filter(band_diff > input$Slider) %>% 
+                filter(band_diff > input$inSlider) %>% 
                 dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
                 arrange(band_size, band_sequence,  band_diff)
-              data
             }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
             
           })
