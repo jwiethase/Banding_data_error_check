@@ -7,3 +7,7 @@ OpWall band data effort.csv
 joined.csv
 .DS_Store
 error_codes.R
+.Rhistory
+.Rproj.user
+.git
+rsconnect
