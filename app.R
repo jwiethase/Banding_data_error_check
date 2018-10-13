@@ -23,7 +23,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                            helpText("'Band.ID' (Format: 'Size-Sequence')"),
                                            helpText("'Species'"),
                                            helpText("'Date' (Format: dmy)"),
-                                           helpText("'Recap (Format: Y/N'"),
+                                           helpText("'Recap (Format: Y/N)'"),
                                            hr(),
                                            shiny::selectInput(inputId = "errorSeek", 
                                                               label = h4("Choose error seeking option"),
@@ -46,7 +46,18 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
 server <- function(input, output, session) {
   data <- reactive({
     req(input$dataset)
-    read.csv(input$dataset$datapath) 
+    data <- read.csv(input$dataset$datapath) 
+    names <- colnames(data)
+    name.Recap <- names[grepl("Recap", names, ignore.case=TRUE) == TRUE]
+    names(data)[names(data) == name.Recap] <- 'Recap'
+    name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
+    names(data)[names(data) == name.spec] <- 'Species'
+    name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
+    names(data)[names(data) == name.band] <- 'Band.ID'
+    
+    data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
+    data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
+    data
   })
   
   observeEvent(data(), {
@@ -68,37 +79,16 @@ server <- function(input, output, session) {
       observe({
         if(input$errorSeek == 'NA in species or band number'){
           output$table <-  renderDT({
-            data <- data()
-            names <- colnames(data)
-            name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.band] <- 'Band.ID'
-            names(data)[names(data) == name.spec] <- 'Species'
-            
-            data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
-            data$band_sequence <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2)
-            
-            data <- data %>% filter(is.na(band_sequence), is.na(Species))
+            data() %>% filter(is.na(band_sequence), is.na(Species))
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
       
       observe({
         if(input$errorSeek == 'Species - band number discrepancies'){
-          
           output$table <-  renderDT({
-            data <- data()
-            names <- colnames(data)
-            name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.band] <- 'Band.ID'
-            
-            data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
-            data$band_sequence <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2)
-            
-            
-            data <- data %>% group_by(Band.ID) %>% dplyr::filter(length(unique(Species)) > 1) %>% 
+            data() %>% 
+              group_by(Band.ID) %>% dplyr::filter(length(unique(Species)) > 1) %>% 
               arrange(Band.ID) %>%
               dplyr::select(Band.ID, Species, everything())
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
@@ -108,23 +98,14 @@ server <- function(input, output, session) {
       observe({
         if(input$errorSeek == 'Same-season recaptures'){
           output$table <-  renderDT({
-            data <- data()
-            names <- colnames(data)
-            name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.band] <- 'Band.ID'
-            
-            data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
-            data$band_sequence <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2)
-            
-            data <- data %>% 
+            data() %>% 
               mutate(Date = dmy(Date)) %>% 
               group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
                                                                                  units='days')) %>% 
               filter(days_diff < 300) %>% 
               arrange(days_diff) %>%
               dplyr::select(days_diff, Date, Species, Band.ID, everything())
+            
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
@@ -132,19 +113,7 @@ server <- function(input, output, session) {
       observe({
         if(input$errorSeek == 'Band sequence discrepancies'){
           output$table <-  renderDT({
-            data <- data()
-            names <- colnames(data)
-            name.Recap <- names[grepl("Recap", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.Recap] <- 'Recap'
-            name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.band] <- 'Band.ID'
-            
-            data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
-            data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
-          
-            data <- data %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% mutate(band_diff = band_sequence - lag(band_sequence))
+            data <- data() %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% mutate(band_diff = band_sequence - lag(band_sequence)) 
             data$band_diff[is.na(data$band_diff)] <- 0
             
             # observe({
@@ -157,6 +126,7 @@ server <- function(input, output, session) {
               filter(band_diff > 2) %>% 
               dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
               arrange(band_size, band_sequence,  band_diff)
+            data
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
@@ -164,17 +134,8 @@ server <- function(input, output, session) {
       observe({
         if(input$errorSeek == 'Unusual band size'){
           output$table <-  renderDT({
-            data <- data()
-            names <- colnames(data)
-            name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.spec] <- 'Species'
-            name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-            names(data)[names(data) == name.band] <- 'Band.ID'
-            
-            data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
-            data$band_sequence <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2)
-            
-            data <- data %>% group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
+           data() %>% 
+              group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(Species) %>% 
               mutate(perc = round((100*N)/sum(unique(N)), digits = 1)) %>% 
               filter(perc <= 10) %>% 
@@ -183,7 +144,6 @@ server <- function(input, output, session) {
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
       })
-      
       
       observeEvent(input$go, {
         output$table <-  renderDT({
@@ -203,8 +163,6 @@ server <- function(input, output, session) {
           })
         }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
       })
-      
-      
     })
 }
 
