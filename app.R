@@ -33,6 +33,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                           'Same-season recaptures', 
                                                                           'Band sequence discrepancies',
                                                                           'Unusual band size')),
+                                           uiOutput("sliderSSR"),
                                            uiOutput("sliderBandDiff"),
                                            hr(),
                                            selectInput("colID", "Select column for typo check", ' '),
@@ -54,7 +55,9 @@ server <- function(input, output, session) {
     names(data)[names(data) == name.spec] <- 'Species'
     name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
     names(data)[names(data) == name.band] <- 'Band.ID'
-    
+    name.date <- names[grepl("Date", names, ignore.case=TRUE) == TRUE]
+    names(data)[names(data) == name.date] <- 'Date'
+    data$Date <- dmy(data$Date)
     data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
     data
@@ -70,16 +73,19 @@ server <- function(input, output, session) {
     input$dataset
     input$errorSeek}, {
       observe({
+        
         if(input$errorSeek == 'None'){
           output$table <-  renderDT({
             data()
           }, options = list(scrollX = TRUE, paging = TRUE), editable = TRUE)
         }
+        
         if(input$errorSeek == 'NA in species or band number'){
           output$table <-  renderDT({
             data() %>% filter(is.na(band_sequence), is.na(Species))
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
+        
         if(input$errorSeek == 'Species - band number discrepancies'){
           output$table <-  renderDT({
             data() %>% 
@@ -88,23 +94,31 @@ server <- function(input, output, session) {
               dplyr::select(Band.ID, Species, everything())
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
+        
         if(input$errorSeek == 'Same-season recaptures'){
-          output$table <-  renderDT({
+          ssr_data <- reactive({
             data <- data() %>% 
-              mutate(Date = dmy(Date)) %>% 
-              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = replace_na(difftime(Date, lag(Date), 
-                                                                                  units='days'))) %>% ungroup()
-              data$days_diff[is.na(data$days_diff)] <- 0
-              
-              data <- data %>% 
+              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = as.integer(difftime(Date, lag(Date), 
+                                                                                             units='days'))) %>% ungroup()
+            data$days_diff[is.na(data$days_diff)] <- 0
+            data
+          })
+          output$sliderSSR <- renderUI({
+            ssr_data <- ssr_data()
+            sliderInput("SliderSSR", "Days difference between captures", min=min(ssr_data$days_diff), max=max(ssr_data$days_diff), value=median(ssr_data$days_diff))
+          })
+          observeEvent(input$SliderSSR, {
+            output$table <-  renderDT({
+              ssr_data() %>% 
                 dplyr::group_by(Band.ID) %>% 
                 dplyr::mutate(days_diff = max(days_diff)) %>% 
-                dplyr::filter(days_diff < 300 & days_diff > 0) %>% 
+                dplyr::filter(days_diff < input$SliderSSR & days_diff > 0) %>% 
                 dplyr::arrange(days_diff) %>%
                 dplyr::select(days_diff, Date, Species, Band.ID, everything())
-            
-          }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+            }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          })
         }
+        
         if(input$errorSeek == 'Band sequence discrepancies'){
           seq_data <- reactive({
             data <- data() %>% filter(Recap == 'N') %>% group_by(band_size) %>% arrange(band_size, band_sequence) %>% 
@@ -123,10 +137,9 @@ server <- function(input, output, session) {
                 dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
                 arrange(band_size, band_sequence,  band_diff)
             }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
-            
           })
-
         }
+        
         if(input$errorSeek == 'Unusual band size'){
           output$table <-  renderDT({
             data() %>% 
