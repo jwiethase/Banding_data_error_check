@@ -33,7 +33,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                           'Same-season recaptures', 
                                                                           'Band sequence discrepancies',
                                                                           'Unusual band size')),
-                                           uiOutput("slider"),
+                                           uiOutput("sliderBandDiff"),
                                            hr(),
                                            selectInput("colID", "Select column for typo check", ' '),
                                            actionButton("go", "Check!", icon = icon("angle-double-right"), width = "auto")
@@ -90,13 +90,18 @@ server <- function(input, output, session) {
         }
         if(input$errorSeek == 'Same-season recaptures'){
           output$table <-  renderDT({
-            data() %>% 
+            data <- data() %>% 
               mutate(Date = dmy(Date)) %>% 
-              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = difftime(Date, lag(Date), 
-                                                                                  units='days')) %>% 
-              filter(days_diff < 300) %>% 
-              arrange(days_diff) %>%
-              dplyr::select(days_diff, Date, Species, Band.ID, everything())
+              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = replace_na(difftime(Date, lag(Date), 
+                                                                                  units='days'))) %>% ungroup()
+              data$days_diff[is.na(data$days_diff)] <- 0
+              
+              data <- data %>% 
+                dplyr::group_by(Band.ID) %>% 
+                dplyr::mutate(days_diff = max(days_diff)) %>% 
+                dplyr::filter(days_diff < 300 & days_diff > 0) %>% 
+                dplyr::arrange(days_diff) %>%
+                dplyr::select(days_diff, Date, Species, Band.ID, everything())
             
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
@@ -107,7 +112,7 @@ server <- function(input, output, session) {
             data$band_diff[is.na(data$band_diff)] <- 0
             data
           })
-          output$slider <- renderUI({
+          output$sliderBandDiff <- renderUI({
             seq_data <- seq_data()
             sliderInput("inSlider", "Max. band difference", min=min(seq_data$band_diff), max=max(seq_data$band_diff), value=median(seq_data$band_diff))
           })
