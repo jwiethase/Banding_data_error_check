@@ -5,6 +5,6 @@ account: wiethase
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 507038
-bundleId: 1640856
+bundleId: 1641128
 url: https://wiethase.shinyapps.io/opwall_error_check/
-when: 1539438603.91893
+when: 1539457760.85934
