@@ -1,0 +1,10 @@
+name: opwall_error_check
+title:
+username:
+account: wiethase
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 507038
+bundleId: 1636873
+url: https://wiethase.shinyapps.io/opwall_error_check/
+when: 1539263125.14846
