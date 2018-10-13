@@ -48,15 +48,6 @@ server <- function(input, output, session) {
   data <- reactive({
     req(input$dataset)
     data <- read.csv(input$dataset$datapath) 
-    names <- colnames(data)
-    name.Recap <- names[grepl("Recap", names, ignore.case=TRUE) == TRUE]
-    names(data)[names(data) == name.Recap] <- 'Recap'
-    name.spec <- names[grepl("Species", names, ignore.case=TRUE) == TRUE]
-    names(data)[names(data) == name.spec] <- 'Species'
-    name.band <- names[grepl("Band", names, ignore.case=TRUE) == TRUE & grepl("ID", names, ignore.case=TRUE) == TRUE]
-    names(data)[names(data) == name.band] <- 'Band.ID'
-    name.date <- names[grepl("Date", names, ignore.case=TRUE) == TRUE]
-    names(data)[names(data) == name.date] <- 'Date'
     data$Date <- dmy(data$Date)
     data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
@@ -98,8 +89,8 @@ server <- function(input, output, session) {
         if(input$errorSeek == 'Same-season recaptures'){
           ssr_data <- reactive({
             data <- data() %>% 
-              group_by(Band.ID) %>% arrange(Date) %>% mutate(days_diff = as.integer(difftime(Date, lag(Date), 
-                                                                                             units='days'))) %>% ungroup()
+              group_by(Band.ID) %>% arrange(Date) %>% 
+              mutate(days_diff = as.integer(difftime(Date, lag(Date), units='days'))) %>% ungroup()
             data$days_diff[is.na(data$days_diff)] <- 0
             data
           })
