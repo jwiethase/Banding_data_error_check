@@ -41,6 +41,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                           'Unusual band size')),
                                            uiOutput("sliderSSR"),
                                            uiOutput("sliderBandDiff"),
+                                           uiOutput("sliderBandSize"),
                                            hr(),
                                            selectInput("colID", "Select column for typo check", ' '),
                                            actionButton("go", "Check!", icon = icon("angle-double-right"), width = "auto")
@@ -64,6 +65,7 @@ server <- function(input, output, session) {
     data$Date <- dmy(data$Date)
     data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
+    data$Species <- trimws(data$Species, which = "both", whitespace = "[ \t\r\n]")
     data
   })
   
@@ -145,15 +147,20 @@ server <- function(input, output, session) {
         }
         
         if(input$errorSeek == 'Unusual band size'){
+          output$sliderBandSize <- renderUI({
+            sliderInput("SliderSize", "Percentage threshold", min=1, max=100, value=c(1,10), dragRange = TRUE)
+          })
+          observeEvent(input$SliderSize, {
           output$table <-  renderDT({
             data() %>% 
               group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(Species) %>% 
               mutate(perc = round((100*N)/sum(unique(N)), digits = 1)) %>% 
-              filter(perc <= 10) %>% 
+              filter(perc > input$SliderSize[1] & perc < input$SliderSize[2]) %>% 
               dplyr::select(band_size, Species, perc, everything()) %>% 
               arrange(Species, perc, band_size)
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          })
         }
       })
 
