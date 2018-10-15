@@ -65,7 +65,6 @@ server <- function(input, output, session) {
     data$Date <- dmy(data$Date)
     data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
-    data$Species <- trimws(data$Species, which = "both", whitespace = "[ \t\r\n]")
     data
   })
   
