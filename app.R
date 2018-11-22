@@ -54,7 +54,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
 server <- function(input, output, session) {
   data <- reactive({
     req(input$dataset)
-    data <- read.csv(input$dataset$datapath, na.strings=c("","NA", "-")) 
+    data <- read.csv(input$dataset$datapath, na.strings=c("","NA", "-", " ")) 
     req.names <- c("Band.ID", "Species", "Date", "Recap")
     validate(
       need(all(req.names %in% colnames(data), TRUE) == TRUE,
@@ -151,13 +151,14 @@ server <- function(input, output, session) {
           })
           observeEvent(input$SliderSize, {
           output$table <-  renderDT({
-            data() %>% 
+            data <- data() %>% 
               group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(Species) %>% 
-              mutate(perc = round((100*N)/sum(unique(N)), digits = 1)) %>% 
+              mutate(perc = round((100*N)/sum(unique(N)), digits = 1),
+                     Majority_size = band_size[N = max(N)]) %>% 
               filter(perc > input$SliderSize[1] & perc < input$SliderSize[2]) %>% 
-              dplyr::select(band_size, Species, perc, everything()) %>% 
-              arrange(Species, perc, band_size)
+              dplyr::select(Species, band_size, perc, Majority_size, everything()) %>% 
+              arrange(Species, perc, Majority_size, band_size)
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
           })
         }
