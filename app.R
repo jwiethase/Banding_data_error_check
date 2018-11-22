@@ -54,7 +54,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
 server <- function(input, output, session) {
   data <- reactive({
     req(input$dataset)
-    data <- read.csv(input$dataset$datapath) 
+    data <- read.csv(input$dataset$datapath, na.strings=c("","NA", "-")) 
     req.names <- c("Band.ID", "Species", "Date", "Recap")
     validate(
       need(all(req.names %in% colnames(data), TRUE) == TRUE,
