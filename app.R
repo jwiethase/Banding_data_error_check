@@ -87,7 +87,7 @@ server <- function(input, output, session) {
         
         if(input$errorSeek == 'NA in species or band number'){
           output$table <-  renderDT({
-            data() %>% filter(is.na(band_sequence), is.na(Species))
+            data() %>% filter(is.na(Band.ID) | is.na(Species))
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
         }
         
