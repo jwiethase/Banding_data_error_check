@@ -180,7 +180,7 @@ server <- function(input, output, session) {
               group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(Species) %>% 
               mutate(perc = round((100*N)/sum(unique(N)), digits = 1),
-                     Majority_size = band_size[N = max(N)]) %>% 
+                     Majority_size = stringr::str_pad(band_size[N = max(N)], 2, side = "left", pad = "0")) %>% 
               filter(perc > input$SliderSize[1] & perc < input$SliderSize[2]) %>% 
               dplyr::select(Species, band_size, perc, Majority_size, everything()) %>% 
               arrange(Species, perc, Majority_size, band_size)
