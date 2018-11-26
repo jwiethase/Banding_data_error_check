@@ -44,11 +44,12 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                            uiOutput("sliderBandSize"),
                                            hr(),
                                            selectInput("colID", "Select column for typo check", ' '),
-                                           actionButton("go", "Check!", icon = icon("angle-double-right"), width = "auto")
+                                           actionButton("go", "Check!", icon = icon("angle-double-right"), width = "auto"),
+                                           downloadButton('downloadData', 'Download')
                                            
                        ),
                        mainPanel(DTOutput("table"), style = "height:900px; overflow-y: scroll;overflow-x: scroll;")
-)
+                         )
 
 # Make the server functions
 server <- function(input, output, session) {
@@ -58,9 +59,9 @@ server <- function(input, output, session) {
     req.names <- c("Band.ID", "Species", "Date", "Recap")
     validate(
       need(all(req.names %in% colnames(data), TRUE) == TRUE,
-                  message = paste("\nError: Missing or miss-spelled column names.\nUnmatched columns:\n\n", paste(c(req.names[req.names %in% colnames(data) == FALSE]), collapse="\n"), sep="")
-           )
+           message = paste("\nError: Missing or miss-spelled column names.\nUnmatched columns:\n\n", paste(c(req.names[req.names %in% colnames(data) == FALSE]), collapse="\n"), sep="")
       )
+    )
     
     data$Date <- dmy(data$Date)
     data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
@@ -72,7 +73,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "colID", choices=colnames(data()))
   })
   
-
+  
   
   shiny::observeEvent({
     input$dataset
@@ -86,18 +87,30 @@ server <- function(input, output, session) {
         }
         
         if(input$errorSeek == 'NA in species or band number'){
+          data <- data() %>% filter(is.na(Band.ID) | is.na(Species))
           output$table <-  renderDT({
-            data() %>% filter(is.na(Band.ID) | is.na(Species))
+            data
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          output$downloadData <- downloadHandler(
+            filename = "NA_spec_band.csv",
+            content = function(file) {
+              write.csv(data, file, row.names = FALSE)
+            })
         }
         
         if(input$errorSeek == 'Species - band number discrepancies'){
+          data <- data() %>% 
+            group_by(Band.ID) %>% dplyr::filter(length(unique(Species)) > 1) %>% 
+            arrange(Band.ID) %>%
+            dplyr::select(Band.ID, Species, everything())
           output$table <-  renderDT({
-            data() %>% 
-              group_by(Band.ID) %>% dplyr::filter(length(unique(Species)) > 1) %>% 
-              arrange(Band.ID) %>%
-              dplyr::select(Band.ID, Species, everything())
+            data
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          output$downloadData <- downloadHandler(
+            filename = "spec_band_discrep.csv",
+            content = function(file) {
+              write.csv(data, file, row.names = FALSE)
+            })
         }
         
         if(input$errorSeek == 'Same-season recaptures'){
@@ -112,15 +125,22 @@ server <- function(input, output, session) {
             ssr_data <- ssr_data()
             sliderInput("SliderSSR", "Days difference between captures", min=min(ssr_data$days_diff), max=max(ssr_data$days_diff), value=median(ssr_data$days_diff))
           })
+          
           observeEvent(input$SliderSSR, {
+            data <- ssr_data() %>% 
+              dplyr::group_by(Band.ID) %>% 
+              dplyr::mutate(days_diff = max(days_diff)) %>% 
+              dplyr::filter(days_diff < input$SliderSSR & days_diff > 0) %>% 
+              dplyr::arrange(days_diff) %>%
+              dplyr::select(days_diff, Date, Species, Band.ID, everything())
             output$table <-  renderDT({
-              ssr_data() %>% 
-                dplyr::group_by(Band.ID) %>% 
-                dplyr::mutate(days_diff = max(days_diff)) %>% 
-                dplyr::filter(days_diff < input$SliderSSR & days_diff > 0) %>% 
-                dplyr::arrange(days_diff) %>%
-                dplyr::select(days_diff, Date, Species, Band.ID, everything())
+              data
             }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+            output$downloadData <- downloadHandler(
+              filename = "same_season_recap.csv",
+              content = function(file) {
+                write.csv(data, file, row.names = FALSE)
+              })
           })
         }
         
@@ -136,12 +156,18 @@ server <- function(input, output, session) {
             sliderInput("inSlider", "Max. band difference", min=min(seq_data$band_diff), max=max(seq_data$band_diff), value=median(seq_data$band_diff))
           })
           observeEvent(input$inSlider, {
+            data <-  seq_data() %>% 
+              filter(band_diff > input$inSlider) %>% 
+              dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
+              arrange(band_size, band_sequence,  band_diff)
             output$table <-  renderDT({
-              seq_data() %>% 
-                filter(band_diff > input$inSlider) %>% 
-                dplyr::select(band_size, band_sequence,  band_diff, Species, everything()) %>% 
-                arrange(band_size, band_sequence,  band_diff)
+              data
             }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+            output$downloadData <- downloadHandler(
+              filename = "band_seq_discrep.csv",
+              content = function(file) {
+                write.csv(data, file, row.names = FALSE)
+              })
           })
         }
         
@@ -150,7 +176,6 @@ server <- function(input, output, session) {
             sliderInput("SliderSize", "Percentage threshold", min=1, max=100, value=c(1,10), dragRange = TRUE)
           })
           observeEvent(input$SliderSize, {
-          output$table <-  renderDT({
             data <- data() %>% 
               group_by(Species, band_size) %>% mutate(N=length(band_size)) %>% 
               group_by(Species) %>% 
@@ -159,11 +184,18 @@ server <- function(input, output, session) {
               filter(perc > input$SliderSize[1] & perc < input$SliderSize[2]) %>% 
               dplyr::select(Species, band_size, perc, Majority_size, everything()) %>% 
               arrange(Species, perc, Majority_size, band_size)
-          }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+            output$table <-  renderDT({
+              data
+            }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+            output$downloadData <- downloadHandler(
+              filename = "unusual_band_size.csv",
+              content = function(file) {
+                write.csv(data, file, row.names = FALSE)
+              })
           })
         }
       })
-
+      
       observeEvent(input$go, {
         output$table <-  renderDT({
           input$go
