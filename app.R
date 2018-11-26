@@ -64,7 +64,7 @@ server <- function(input, output, session) {
     )
     
     data$Date <- dmy(data$Date)
-    data$band_size <- sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1)
+    data$band_size <- stringr::str_pad(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1), 2, side = "left", pad = "0")
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
     data
   })
