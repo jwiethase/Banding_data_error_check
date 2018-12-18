@@ -30,7 +30,7 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                            helpText("'Species'"),
                                            helpText("'Sex'"),
                                            helpText("'Age'"),
-                                           helpText("'Date' (Format: dmy)"),
+                                           helpText("'Date' (Format: ymd)"),
                                            helpText("'Recap (Format: Y/N)'"),
                                            hr(),
                                            shiny::selectInput(inputId = "errorSeek", 
@@ -67,7 +67,7 @@ server <- function(input, output, session) {
       )
     )
     
-    data$Date <- dmy(data$Date)
+    data$Date <- ymd(data$Date)
     data$band_size <- stringr::str_pad(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1), 2, side = "left", pad = "0")
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
     data
@@ -151,25 +151,11 @@ server <- function(input, output, session) {
         }
         
         if(input$errorSeek == 'Same-season recaptures'){
-          ssr_data <- reactive({
-            data <- data() %>% 
-              group_by(Band.ID) %>% arrange(Date) %>% 
-              mutate(days_diff = as.integer(difftime(Date, lag(Date), units='days'))) %>% ungroup()
-            data$days_diff[is.na(data$days_diff)] <- 0
-            data
-          })
-          output$sliderSSR <- renderUI({
-            ssr_data <- ssr_data()
-            sliderInput("SliderSSR", "Days difference between captures", min=min(ssr_data$days_diff), max=max(ssr_data$days_diff), value=median(ssr_data$days_diff))
-          })
+          data <- data %>% 
+            group_by(Band.ID, field.season) %>% 
+            filter(n() > 1, !is.na(Band.ID)) %>% 
+            arrange(Band.ID, DateTime)
           
-          observeEvent(input$SliderSSR, {
-            data <- ssr_data() %>% 
-              dplyr::group_by(Band.ID) %>% 
-              dplyr::mutate(days_diff = max(days_diff)) %>% 
-              dplyr::filter(days_diff < input$SliderSSR & days_diff > 0) %>% 
-              dplyr::arrange(days_diff) %>%
-              dplyr::select(days_diff, Date, Species, Band.ID, everything())
             output$table <-  renderDT({
               data
             }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
@@ -178,7 +164,6 @@ server <- function(input, output, session) {
               content = function(file) {
                 write.csv(data, file, row.names = FALSE)
               })
-          })
         }
         
         if(input$errorSeek == 'Band sequence discrepancies'){
