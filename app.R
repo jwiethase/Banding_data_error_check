@@ -43,7 +43,6 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                                           'Same-season recaptures', 
                                                                           'Band sequence discrepancies',
                                                                           'Unusual band size')),
-                                           uiOutput("sliderSSR"),
                                            uiOutput("sliderBandDiff"),
                                            uiOutput("sliderBandSize"),
                                            hr(),
@@ -68,6 +67,7 @@ server <- function(input, output, session) {
     )
     
     data$Date <- ymd(data$Date)
+    data$field.season <- year(data$Date)
     data$band_size <- stringr::str_pad(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 1), 2, side = "left", pad = "0")
     data$band_sequence <- as.numeric(sapply(strsplit(as.character(data$Band.ID), split="-"), `[`, 2))
     data
@@ -151,10 +151,11 @@ server <- function(input, output, session) {
         }
         
         if(input$errorSeek == 'Same-season recaptures'){
-          data <- data %>% 
+          data <- data() %>% 
             group_by(Band.ID, field.season) %>% 
             filter(n() > 1, !is.na(Band.ID)) %>% 
-            arrange(Band.ID, DateTime)
+            arrange(Band.ID, DateTime) %>% 
+            select(Band.ID, field.season, DateTime, everything())
           
             output$table <-  renderDT({
               data
