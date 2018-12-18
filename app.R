@@ -152,8 +152,8 @@ server <- function(input, output, session) {
         
         if(input$errorSeek == 'Same-season recaptures'){
           data <- data() %>% 
-            group_by(Band.ID, field.season) %>% 
-            filter(n() > 1, !is.na(Band.ID)) %>% 
+            group_by(Band.ID, field.season, Species) %>% 
+            filter(n() > 1, !is.na(Band.ID), !is.na(DateTime)) %>% 
             arrange(Band.ID, DateTime) %>% 
             select(Band.ID, field.season, DateTime, everything())
           
