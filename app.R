@@ -28,6 +28,8 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                            hr(),
                                            helpText("'Band.ID' (Format: 'Size-Sequence')"),
                                            helpText("'Species'"),
+                                           helpText("'Sex'"),
+                                           helpText("'Age'"),
                                            helpText("'Date' (Format: dmy)"),
                                            helpText("'Recap (Format: Y/N)'"),
                                            hr(),
@@ -36,6 +38,8 @@ ui <- shiny::fluidPage(theme = "bootstrap.css",
                                                               choices = c('None',
                                                                           'NA in species or band number',
                                                                           'Species - band number discrepancies',
+                                                                          'Sex - band number discrepancies',
+                                                                          'Age - band number discrepancies',
                                                                           'Same-season recaptures', 
                                                                           'Band sequence discrepancies',
                                                                           'Unusual band size')),
@@ -100,6 +104,7 @@ server <- function(input, output, session) {
         
         if(input$errorSeek == 'Species - band number discrepancies'){
           data <- data() %>% 
+            filter(!is.na(Band.ID)) %>% 
             group_by(Band.ID) %>% dplyr::filter(length(unique(Species)) > 1) %>% 
             arrange(Band.ID) %>%
             dplyr::select(Band.ID, Species, everything())
@@ -108,6 +113,38 @@ server <- function(input, output, session) {
           }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
           output$downloadData <- downloadHandler(
             filename = "spec_band_discrep.csv",
+            content = function(file) {
+              write.csv(data, file, row.names = FALSE)
+            })
+        }
+        
+        if(input$errorSeek == 'Sex - band number discrepancies'){
+          data <- data() %>% 
+            filter(!is.na(Band.ID)) %>% 
+            group_by(Band.ID) %>% dplyr::filter(length(unique(Sex)) > 1) %>% 
+            arrange(Band.ID) %>%
+            dplyr::select(Band.ID, Sex, Date, everything())
+          output$table <-  renderDT({
+            data
+          }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          output$downloadData <- downloadHandler(
+            filename = "sex_band_discrep.csv",
+            content = function(file) {
+              write.csv(data, file, row.names = FALSE)
+            })
+        }
+        
+        if(input$errorSeek == 'Age - band number discrepancies'){
+          data <- data() %>% 
+            filter(!is.na(Band.ID)) %>% 
+            group_by(Band.ID) %>% dplyr::filter(length(unique(Age)) > 1) %>% 
+            arrange(Band.ID) %>%
+            dplyr::select(Band.ID, Age, Date, everything())
+          output$table <-  renderDT({
+            data
+          }, options = list(scrollX = TRUE, paging = FALSE), editable = TRUE)
+          output$downloadData <- downloadHandler(
+            filename = "sex_band_discrep.csv",
             content = function(file) {
               write.csv(data, file, row.names = FALSE)
             })
@@ -194,6 +231,9 @@ server <- function(input, output, session) {
               })
           })
         }
+        
+       
+        
       })
       
       observeEvent(input$go, {
